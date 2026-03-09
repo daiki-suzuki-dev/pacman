@@ -41,6 +41,38 @@ LEVEL_LAYOUTS = [
         "WG........................GW",
         "WWWWWWWWWWWWWWWWWWWWWWWWWWWW",
     ],
+
+     # Level 2 - More complex layout
+    [
+        "WWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+        "WG......................G.oW",
+        "W.WWWWWW.WWWWW.WWWWW.WWWWW.W",
+        "W.WWWWWW.WWWWW.WWWWW.WWWWW.W",
+        "W.WW.....WW....WW....WW....W",
+        "W.WW.WWW.WW.WWWWW.WWWWW.WW.W",
+        "W.WW.WWW.WW.WWWWW.WWWWW.WW.W",
+        "W....WWW.............WWW...W",
+        "WWWW.WWW.WWW.WWW.WWW.WWW.WWW",
+        "WWWW.WWW.WWW.WWW.WWW.WWW.WWW",
+        "W....WWW.WWW.....WWW.WWW...W",
+        "W.WWWWWW.WWWWW.WWWWW.WWWWW.W",
+        "W.WWWWWW.WWWWW.WWWWW.WWWWW.W",
+        "Wo............P...........oW",
+        "WWWWWWWW.WWWWW.WWWWW.WWWWWWW",
+        "WWWWWWWW.WWWWW.WWWWW.WWWWWWW",
+        "W..........................W",
+        "W.WWW.WWWWWWW.W.WWWWWWW.WW.W",
+        "W.WWW.WWWWWWW.W.WWWWWWW.WW.W",
+        "W.WWW.........W.........WW.W",
+        "W.WWW.WWWW.WWWWWWW.WWWW.WW.W",
+        "W.WWW.WWWW.WWWWWWW.WWWW.WW.W",
+        "WG....WWWW.........WWWW....W",
+        "WWWWW.WWWWWWWWWWWWWWWWW.WWWW",
+        "WWWWW.WWWWWWWWWWWWWWWWW.WWWW",
+        "WWWWW..................GWWWW",
+        "WWWWWoWWWWWWWWWWWWWWWWWoWWWW",
+        "WWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+    ],
 ]
 
 
@@ -116,7 +148,12 @@ class Menu:
         self.inst_y = h - 100
         x = (w - bw) // 2
         y = self.desc_y + 100
-        self.buttons = [Button(screen, "Start Game", (x, y), (bw, bh), start_game_callback)]
+
+        self.buttons = [
+            Button(screen, "Level 1", (x, y), (bw, bh), start_game_callback, 1),
+            Button(screen, "Level 2", (x, y + 70), (bw, bh), start_game_callback, 2)
+        ]
+
         self.logo_font = pygame.font.SysFont('Arial', 96, bold=True)
         self.info_font = pygame.font.SysFont('Arial', 32)
 
@@ -194,15 +231,16 @@ class PacMan:
 
 class Ghost:
 
-    def __init__(self, x, y, size, color):
+    def __init__(self, x, y, size, color, behavior="chase"):
         self.start_x = x
         self.start_y = y
         self.size = size
         self.color = color
         self.rect = pygame.Rect(x, y, size, size)
         self.direction = random.choice(CARDINALS)
-        self.speed = 1.1
+        self.speed = 1.3
         self.scared_color = (0, 0, 255)
+        self.behavior = behavior
 
     def reset(self):
         self.rect.x = self.start_x
@@ -223,11 +261,14 @@ class Ghost:
         dirs = self.valid_directions(walls)
         if not dirs:
             return self.direction
+
         opposite = (-self.direction[0], -self.direction[1])
         if len(dirs) > 1 and opposite in dirs:
             dirs.remove(opposite)
+
         best_dir = None
         best_dist = float("inf")
+
         for d in dirs:
             nr = self.rect.copy()
             nr.x += d[0] * self.size
@@ -235,30 +276,63 @@ class Ghost:
             dx = target.centerx - nr.centerx
             dy = target.centery - nr.centery
             dist = dx * dx + dy * dy
+
             if dist < best_dist:
                 best_dist = dist
                 best_dir = d
+
         return best_dir if best_dir else random.choice(dirs)
 
     def update(self, walls, pacman, scared=False):
+
         if scared:
             tx = self.rect.x - (pacman.rect.x - self.rect.x)
             ty = self.rect.y - (pacman.rect.y - self.rect.y)
             target = pygame.Rect(tx, ty, 1, 1)
+
         else:
-            target = pacman.rect
+
+            if self.behavior == "chase":
+                target = pacman.rect
+
+            elif self.behavior == "ambush":
+                px = pacman.rect.centerx + pacman.direction[0] * 80
+                py = pacman.rect.centery + pacman.direction[1] * 80
+                target = pygame.Rect(px, py, 1, 1)
+
+            elif self.behavior == "random":
+                if random.random() < 0.05:
+                    self.direction = random.choice(CARDINALS)
+                target = pacman.rect
+
+            elif self.behavior == "patrol":
+                px = pacman.rect.centerx
+                py = pacman.rect.centery
+                if px > self.rect.x:
+                    px -= 120
+                else:
+                    px += 120
+                target = pygame.Rect(px, py, 1, 1)
+
+            else:
+                target = pacman.rect
+
         self.direction = self.choose_direction(walls, target)
+
         nr = self.rect.copy()
         nr.x += self.direction[0] * self.speed
         nr.y += self.direction[1] * self.speed
+
         if not any(nr.colliderect(w) for w in walls):
             self.rect = nr
 
     def draw(self, screen, scared=False):
         color = self.scared_color if scared else self.color
         ey = self.rect.centery - self.size // 4
+
         pygame.draw.circle(screen, color, (self.rect.centerx, ey), self.size // 2)
         pygame.draw.rect(screen, color, (self.rect.x, ey, self.size, self.size // 2))
+
         for i in range(3):
             pygame.draw.circle(
                 screen,
@@ -290,7 +364,7 @@ class Game:
         self.screen = screen
         self.level_done, self.game_over = level_done, game_over
         self.score, self.lives, self.paused = 0, 3, False
-        self.map_data = LEVEL_LAYOUTS[0]
+        self.map_data = LEVEL_LAYOUTS[level_num - 1]
         mw, mh = len(self.map_data[0]) * TILE, len(self.map_data) * TILE
         self.map_ox = (screen.get_width() - mw) // 2
         self.map_oy = (screen.get_height() - mh) // 2
@@ -301,13 +375,15 @@ class Game:
     def create_entities(self, mw, mh):
         self.pacman, self.ghosts, self.pellets, self.power_pellets = None, [], [], []
         ghost_colors = [(255, 0, 0), (255, 184, 255), (0, 255, 255), (255, 184, 82)]
+        ghost_behaviors = ["chase", "ambush", "random", "patrol"]
         for y, row in enumerate(self.map_data):
             for x, cell in enumerate(row):
                 sx, sy = self.map_ox + x * TILE, self.map_oy + y * TILE
                 if cell == 'P': self.pacman = PacMan(sx, sy, TILE)
                 elif cell in ('G','g'):
                     color = ghost_colors[len(self.ghosts) % len(ghost_colors)]
-                    self.ghosts.append(Ghost(sx, sy, TILE, color))
+                    behavior = ghost_behaviors[len(self.ghosts) % len(ghost_behaviors)]
+                    self.ghosts.append(Ghost(sx, sy, TILE, color, behavior))
                 elif cell == '.': self.pellets.append(Pellet(sx, sy, TILE, False))
                 elif cell in ('O', 'o'): self.power_pellets.append(Pellet(sx, sy, TILE, True))
         self.wall_rects = [
@@ -382,8 +458,10 @@ class PacManGame:
         self.menu = Menu(screen, self.start_game)
         self.game = None
 
-    def start_game(self):
-        self.game = Game(screen, 1, self.end_level, self.game_over_cb)
+    def start_game(self, level):
+        self.level = level
+        self.score = 0
+        self.game = Game(self.screen, level, self.end_level, self.game_over_cb)
         self.state = PLAYING
 
     def end_level(self, score):
