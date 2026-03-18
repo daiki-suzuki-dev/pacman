@@ -3,10 +3,12 @@ import os
 import pandas as pd
 import json
 import time
+from dotenv import load_dotenv
 
 # -----------------------------
 # LOAD CONFIG
 # -----------------------------
+load_dotenv()
 
 MANATAL_API_KEY = os.getenv("MANATAL_API_KEY")
 ASHBY_API_KEY = os.getenv("ASHBY_API_KEY")
